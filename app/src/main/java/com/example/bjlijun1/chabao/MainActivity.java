@@ -13,6 +13,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,9 +58,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView tv;
     private static final OkHttpClient client = new OkHttpClient();
     public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-    private String IP;
-    private String location;
-    
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,6 +87,45 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    //TODO:get ip addresss
+    private String getIp(){
+        String ip = "";
+        try{
+            String address = "http://ip.taobao.com/service/getIpInfo2.php?ip=myip";
+            URL url = new URL(address);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setUseCaches(false);
+            if(connection.getResponseCode() == HttpURLConnection.HTTP_OK){
+                InputStream in = connection.getInputStream();
+                //transform stream into string
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                String tmpString = "";
+                StringBuilder retJson = new StringBuilder();
+                while ((tmpString = reader.readLine()) != null){
+                    retJson.append(tmpString + "\n");
+                }
+                JSONObject jsonObject = new JSONObject(retJson.toString());
+                int code = jsonObject.getInt("code");
+                if ( code == 0 ){
+                    JSONObject data = jsonObject.getJSONObject("data");
+                    ip = data.getString("ip") + "(" + data.getString("country") + data.getString("area") + data.getString("region") + data.getString("city") + data.getString("isp") + ")";
+                    Log.i(LOGTAG,"IP: " + ip);
+                }else{
+                    ip = "";
+                    Log.i(LOGTAG,"IP 接口异常，无法获取IP地址");
+                }
+            } else {
+                ip = "";
+                Log.i(LOGTAG,"网络连接异常，无法获取IP地址");
+            }
+        } catch (Exception e) {
+            Log.i(LOGTAG,"Exception in get IP");
+            e.printStackTrace();
+        }
+        return ip;
+    }
+
 
     @SuppressWarnings("unchecked")
     private class MyAsyncTask extends AsyncTask<ArrayList<String>,Integer,String> {
@@ -164,7 +205,12 @@ public class MainActivity extends AppCompatActivity {
                 Document doc = conn.get();
 
                 // post to server
-                RequestBody body = new FormBody.Builder().add("url",url).add("html",doc.toString()).build();
+                //TODO: Add more infomation
+                //.add(new BasicNameValuePair("ip",ip));
+                //.add(new BasicNameValuePair("Android Version", version));
+                String ip = getIp();
+                RequestBody body = new FormBody.Builder().add("url",url).add("html",doc.toString()).add("ip",ip).build();
+
                 Request request = new Request.Builder().url(SERVER_ADDR).post(body).build();
                 Response response = client.newCall(request).execute();
                 if (response.isSuccessful()) {
@@ -184,10 +230,6 @@ public class MainActivity extends AppCompatActivity {
                 else {
                     flag = false;
                 }
-
-                //TODO: Add more infomation
-                //.add(new BasicNameValuePair("ip",ip));
-                //.add(new BasicNameValuePair("Android Version", version));
 
 
             } catch (Exception e) {
